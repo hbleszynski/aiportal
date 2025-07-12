@@ -22,7 +22,7 @@ import {
   FilePreviewRemove,
   OverflowChipButton,
   OverflowDropdown
-} from './ChatWindow.styled';
+} from './ChatInputArea.styled';
 
 const ChatInputArea = forwardRef(({
   chatIsEmpty,

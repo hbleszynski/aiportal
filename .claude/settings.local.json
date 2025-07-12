@@ -27,7 +27,14 @@
       "Bash(mv:*)",
       "Bash(export VITE_BACKEND_API_URL=http://localhost:3000)",
       "Bash(ss:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(python3:*)",
+      "Bash(git checkout:*)",
+      "Bash(sed:*)",
+      "Bash(chmod:*)",
+      "Bash(./fix_chatmessage.sh:*)",
+      "Bash(./fix_newsettingspanel.sh:*)",
+      "Bash(./fix_newsettings_final.sh:*)"
     ],
     "deny": []
   }
