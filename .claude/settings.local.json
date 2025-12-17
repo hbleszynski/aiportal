@@ -27,7 +27,13 @@
       "Bash(mv:*)",
       "Bash(export VITE_BACKEND_API_URL=http://localhost:3000)",
       "Bash(ss:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(tree:*)",
+      "WebFetch(domain:openrouter.ai)",
+      "Bash(jq:*)",
+      "WebSearch",
+      "Bash(findstr:*)",
+      "WebFetch(domain:gist.github.com)"
     ],
     "deny": []
   }

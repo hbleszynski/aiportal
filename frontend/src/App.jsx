@@ -31,6 +31,9 @@ import WorkspacePage from './pages/WorkspacePage';
 import ForcedLoginScreen from './components/ForcedLoginScreen';
 import MobileForcedLoginScreen from './components/mobile/MobileForcedLoginScreen';
 import DinosaurRunGame from './components/DinosaurRunGame';
+import ConfettiExplosion from './components/ConfettiExplosion';
+import MatrixRain from './components/MatrixRain';
+import useEasterEggs from './hooks/useEasterEggs';
 
 const AppContainer = styled.div`
   display: flex;
@@ -218,7 +221,7 @@ const useIsMobile = () => {
 
 // Main app component
 const AppContent = () => {
-  const { user, adminUser, updateSettings: updateUserSettings, loading } = useAuth();
+  const { user, adminUser, updateSettings: updateUserSettings, loading, logout } = useAuth();
   const toast = useToast();
   const isMobile = useIsMobile();
   const location = useLocation();
@@ -442,6 +445,14 @@ const AppContent = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showDinosaurGame, setShowDinosaurGame] = useState(false);
   const chatWindowRef = useRef(null);
+
+  // Easter eggs hook
+  const {
+    showConfetti,
+    showMatrix,
+    closeConfetti,
+    closeMatrix,
+  } = useEasterEggs();
 
   // Update settings when user changes
   useEffect(() => {
@@ -934,6 +945,7 @@ const AppContent = () => {
               collapsed={collapsed}
               setCollapsed={setCollapsed}
               settings={settings}
+              onSignOut={logout}
             />
             {console.log('Available models for ChatWindow:', availableModels)}
             <Routes>
@@ -1100,6 +1112,15 @@ ${JSON.stringify(objects, null, 2)}
               $flowchartOpen={isFlowchartOpen}
               $sandbox3DOpen={isSandbox3DOpen}
             />
+          )}
+
+          {/* Easter Eggs */}
+          {showConfetti && (
+            <ConfettiExplosion onComplete={closeConfetti} message={confettiMessage} />
+          )}
+
+          {showMatrix && (
+            <MatrixRain onExit={closeMatrix} duration={15000} />
           )}
         </AppContainer>
       </GlobalStylesProvider>
