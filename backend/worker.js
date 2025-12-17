@@ -24,11 +24,56 @@
  * - src/utils/           - Utility functions
  *   - helpers.js         - Common helpers
  *   - auth.js            - Auth utilities
+ *
+ * - Proxies WebSocket traffic for Gemini Live (/api/v1/live)
+ * - Serves the Hono app for REST APIs and static assets
  */
 
 import app from './src/index.js';
 
 const GEMINI_LIVE_WS_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent';
+const MAX_CLIENT_MESSAGE_BYTES = 1024 * 1024; // 1MB per client message
+const MAX_MESSAGE_QUEUE = 64; // Prevent unbounded buffering while reconnecting
+const MAX_RECONNECT_ATTEMPTS = 2;
+
+function jsonResponse(body, status = 200, origin = '*') {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': origin
+    }
+  });
+}
+
+function isOriginAllowed(request, env) {
+  const origin = request.headers.get('Origin');
+  if (!origin) return true;
+
+  const allowList = (env.LIVE_WS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  if (allowList.length === 0) {
+    const url = new URL(request.url);
+    return origin === `${url.protocol}//${url.host}`;
+  }
+
+  return allowList.includes(origin);
+}
+
+function authorizeLive(request, env) {
+  const sharedSecret = env.LIVE_WS_SHARED_SECRET;
+  if (!sharedSecret) return { ok: true };
+
+  const url = new URL(request.url);
+  const token = url.searchParams.get('token');
+
+  if (token === sharedSecret) return { ok: true };
+
+  return { ok: false, status: 401, message: 'Unauthorized live access' };
+}
 
 /**
  * Handle WebSocket upgrade for Gemini Live
@@ -37,7 +82,16 @@ const GEMINI_LIVE_WS_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai
 async function handleGeminiLiveWebSocket(request, env) {
   const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) {
-    return new Response('Gemini API key not configured', { status: 500 });
+    return jsonResponse({ error: 'Gemini API key not configured' }, 500);
+  }
+
+  if (!isOriginAllowed(request, env)) {
+    return jsonResponse({ error: 'Forbidden origin' }, 403);
+  }
+
+  const auth = authorizeLive(request, env);
+  if (!auth.ok) {
+    return jsonResponse({ error: auth.message }, auth.status);
   }
 
   // Create WebSocket pair for client connection
@@ -52,35 +106,56 @@ async function handleGeminiLiveWebSocket(request, env) {
 
   let geminiWs = null;
   let messageQueue = [];
+  let reconnectAttempts = 0;
+  let closed = false;
+
+  const forwardToClient = (payload) => {
+    if (server.readyState === WebSocket.OPEN) {
+      server.send(JSON.stringify(payload));
+    }
+  };
+
+  const closeBoth = (code, reason) => {
+    if (closed) return;
+    closed = true;
+
+    try {
+      if (server.readyState === WebSocket.OPEN) {
+        server.close(code, reason);
+      }
+    } catch (err) {
+      console.error('[GeminiLive] Error closing client socket:', err);
+    }
+
+    try {
+      if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
+        geminiWs.close(code, reason);
+      }
+    } catch (err) {
+      console.error('[GeminiLive] Error closing upstream socket:', err);
+    }
+  };
 
   // Function to connect to Gemini
   const connectToGemini = async () => {
     try {
       console.log('[GeminiLive] Connecting to Gemini API...');
-
-      // Use fetch with Upgrade header for Cloudflare Workers
       const geminiResponse = await fetch(geminiUrl, {
-        headers: {
-          'Upgrade': 'websocket',
-        },
+        headers: { 'Upgrade': 'websocket' }
       });
 
-      if (geminiResponse.status !== 101) {
+      if (geminiResponse.status !== 101 || !geminiResponse.webSocket) {
         throw new Error(`Failed to upgrade: ${geminiResponse.status} ${geminiResponse.statusText}`);
       }
 
       geminiWs = geminiResponse.webSocket;
-      if (!geminiWs) {
-        throw new Error('No WebSocket in response');
-      }
-
       geminiWs.accept();
       console.log('[GeminiLive] Connected to Gemini API');
+      reconnectAttempts = 0;
 
       // Send any queued messages
-      while (messageQueue.length > 0) {
-        const msg = messageQueue.shift();
-        geminiWs.send(msg);
+      while (messageQueue.length > 0 && geminiWs.readyState === WebSocket.OPEN) {
+        geminiWs.send(messageQueue.shift());
       }
 
       // Forward messages from Gemini to client
@@ -91,33 +166,42 @@ async function handleGeminiLiveWebSocket(request, env) {
       });
 
       geminiWs.addEventListener('close', (event) => {
-        console.log('[GeminiLive] Gemini closed:', event.code, event.reason);
-        if (server.readyState === WebSocket.OPEN) {
-          server.send(JSON.stringify({
-            connectionClosed: {
-              code: event.code,
-              reason: event.reason || 'Gemini connection closed'
-            }
-          }));
+        console.warn('[GeminiLive] Gemini closed:', event.code, event.reason);
+
+        if (closed) return;
+
+        if (server.readyState === WebSocket.OPEN && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts += 1;
+          forwardToClient({
+            reconnecting: true,
+            attempt: reconnectAttempts,
+            reason: event.reason || 'Upstream closed'
+          });
+          connectToGemini().catch((err) => {
+            forwardToClient({ error: { message: err.message || 'Failed to reconnect to Gemini' } });
+            closeBoth(1011, 'Upstream unavailable');
+          });
+          return;
         }
+
+        forwardToClient({
+          connectionClosed: {
+            code: event.code,
+            reason: event.reason || 'Gemini connection closed'
+          }
+        });
+        closeBoth(1011, 'Upstream closed');
       });
 
       geminiWs.addEventListener('error', (error) => {
         console.error('[GeminiLive] Gemini error:', error);
-        if (server.readyState === WebSocket.OPEN) {
-          server.send(JSON.stringify({
-            error: { message: 'Gemini WebSocket error' }
-          }));
-        }
+        forwardToClient({ error: { message: 'Gemini WebSocket error' } });
       });
 
     } catch (error) {
       console.error('[GeminiLive] Connection error:', error);
-      if (server.readyState === WebSocket.OPEN) {
-        server.send(JSON.stringify({
-          error: { message: `Failed to connect to Gemini: ${error.message}` }
-        }));
-      }
+      forwardToClient({ error: { message: `Failed to connect to Gemini: ${error.message}` } });
+      closeBoth(1011, 'Upstream connect error');
     }
   };
 
@@ -126,33 +210,44 @@ async function handleGeminiLiveWebSocket(request, env) {
 
   // Handle messages from client
   server.addEventListener('message', (event) => {
+    if (closed) return;
+
+    const size = typeof event.data === 'string'
+      ? event.data.length
+      : (event.data instanceof ArrayBuffer ? event.data.byteLength : (event.data?.byteLength || 0));
+    if (size > MAX_CLIENT_MESSAGE_BYTES) {
+      forwardToClient({ error: { message: 'Payload too large' } });
+      closeBoth(1009, 'Payload too large');
+      return;
+    }
+
     if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
       geminiWs.send(event.data);
     } else {
-      // Queue message if not connected yet
+      if (messageQueue.length >= MAX_MESSAGE_QUEUE) {
+        forwardToClient({ error: { message: 'Upstream unavailable' } });
+        closeBoth(1013, 'Message queue overflow');
+        return;
+      }
       messageQueue.push(event.data);
     }
   });
 
   // Handle client disconnect
   server.addEventListener('close', (event) => {
-    console.log('[GeminiLive] Client disconnected:', event.code);
-    if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
-      geminiWs.close(1000, 'Client disconnected');
-    }
+    if (closed) return;
+    closeBoth(event.code || 1000, event.reason || 'Client disconnected');
   });
 
   server.addEventListener('error', (error) => {
     console.error('[GeminiLive] Client error:', error);
-    if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
-      geminiWs.close(1011, 'Client error');
-    }
+    closeBoth(1011, 'Client error');
   });
 
   // Return WebSocket upgrade response to client
   return new Response(null, {
     status: 101,
-    webSocket: client,
+    webSocket: client
   });
 }
 
@@ -160,61 +255,59 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Handle WebSocket upgrade for Gemini Live (production only)
+    // Handle WebSocket upgrade for Gemini Live
     if (url.pathname === '/api/v1/live') {
       const upgradeHeader = request.headers.get('Upgrade');
       if (upgradeHeader && upgradeHeader.toLowerCase() === 'websocket') {
-        // WebSocket proxy only works in production Cloudflare Workers
-        // For local dev, use /api/v1/live/config to get connection info
         return handleGeminiLiveWebSocket(request, env);
       }
+
       // Non-WebSocket request - return status
-      return new Response(JSON.stringify({
+      return jsonResponse({
         available: !!env.GEMINI_API_KEY,
         endpoint: '/api/v1/live',
         hint: 'Connect via WebSocket to use Gemini Live'
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        }
       });
     }
 
-    // Provide Gemini Live config for direct connection (local dev fallback)
+    // Provide Gemini Live config for local development (no API key leakage)
     if (url.pathname === '/api/v1/live/config') {
+      const originAllowed = isOriginAllowed(request, env);
+      if (!originAllowed) {
+        return jsonResponse({ error: 'Forbidden origin' }, 403);
+      }
+
+      const auth = authorizeLive(request, env);
+      if (!auth.ok) {
+        return jsonResponse({ error: auth.message }, auth.status);
+      }
+
+      const requestOrigin = request.headers.get('Origin') || url.origin;
+
+      // Restrict config exposure unless explicitly enabled or running locally
+      const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+      const allowConfig = env.ALLOW_LIVE_CONFIG === 'true' || isLocal;
+
+      if (!allowConfig) {
+        return jsonResponse({ error: 'Live config endpoint disabled' }, 403);
+      }
+
       // Handle CORS preflight
       if (request.method === 'OPTIONS') {
         return new Response(null, {
           headers: {
-            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Origin': requestOrigin,
             'Access-Control-Allow-Methods': 'GET, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
           }
         });
       }
 
-      const apiKey = env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return new Response(JSON.stringify({ error: 'Gemini API key not configured' }), {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          }
-        });
-      }
-
-      // Return the WebSocket URL with API key for direct connection
-      return new Response(JSON.stringify({
-        wsUrl: `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`,
-        model: 'models/gemini-2.5-flash-preview-native-audio'
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        }
-      });
+      return jsonResponse({
+        proxyEndpoint: '/api/v1/live',
+        model: 'models/gemini-2.5-flash-preview-native-audio',
+        note: 'Connect to proxy endpoint; API key remains server-side.'
+      }, 200, requestOrigin);
     }
 
     // Pass all other requests to Hono app
