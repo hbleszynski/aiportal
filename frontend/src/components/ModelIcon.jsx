@@ -115,11 +115,17 @@ const ModelIcon = ({ modelId, size = 'medium', $inMessage = false }) => {
   // Try to get image from the MODEL_LOGOS mapping (unless it's a custom model)
   let imageUrl = !isCustomModel ? MODEL_LOGOS[modelId] : null;
 
-  // For custom models, we'll use the emoji instead of an image
+  // Helper function to check if avatar is an image (base64 or URL)
+  const isImageAvatar = (avatar) => {
+    if (!avatar) return false;
+    return avatar.startsWith('data:image/') || avatar.startsWith('http://') || avatar.startsWith('https://');
+  };
+
+  // For custom models, we'll use the emoji or custom image
   if (isCustomModel) {
-    // Get the available models from the parent context to find the emoji
+    // Get the available models from the parent context to find the avatar
     // Since we don't have access to availableModels here, we'll need to parse the model ID
-    // The modelId format is 'custom-{id}', we need to get the emoji from localStorage
+    // The modelId format is 'custom-{id}', we need to get the avatar from localStorage
     try {
       const customModelsJson = localStorage.getItem('customModels');
       if (customModelsJson) {
@@ -127,8 +133,14 @@ const ModelIcon = ({ modelId, size = 'medium', $inMessage = false }) => {
         const modelNumericId = modelId.replace('custom-', '');
         const customModel = customModels.find(m => m.id.toString() === modelNumericId);
         if (customModel && customModel.avatar) {
-          iconComponent = <span style={{ fontSize: '1.2em' }}>{customModel.avatar}</span>;
-          iconBackground = 'transparent';
+          // Check if avatar is an image (base64 or URL)
+          if (isImageAvatar(customModel.avatar)) {
+            imageUrl = customModel.avatar;
+          } else {
+            // It's an emoji
+            iconComponent = <span style={{ fontSize: '1.2em' }}>{customModel.avatar}</span>;
+            iconBackground = 'transparent';
+          }
         } else {
           // Fallback to first letter
           iconComponent = 'C';
@@ -136,7 +148,7 @@ const ModelIcon = ({ modelId, size = 'medium', $inMessage = false }) => {
         }
       }
     } catch (err) {
-      console.error('Error getting custom model emoji:', err);
+      console.error('Error getting custom model avatar:', err);
       iconComponent = 'C';
       iconBackground = '#888';
     }
