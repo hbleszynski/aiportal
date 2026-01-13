@@ -709,9 +709,12 @@ const SettingsModal = ({ settings, updateSettings, closeModal }) => {
                 onChange={(e) => handleChange('fontFamily', e.target.value)}
               >
                 <option value="system">System Default</option>
-                <option value="inter">Inter</option>
+                <option value="inter">Space Mono</option>
                 <option value="roboto">Roboto</option>
                 <option value="opensans">Open Sans</option>
+                <option value="montserrat">Montserrat</option>
+                <option value="lato">Lato</option>
+                <option value="caveat">Caveat</option>
                 <option value="georgia">Georgia</option>
                 <option value="merriweather">Merriweather</option>
               </SelectBox>
@@ -779,6 +782,16 @@ const SettingsModal = ({ settings, updateSettings, closeModal }) => {
             <SettingGroup>
               <SettingLabel>Message Alignment</SettingLabel>
               <RadioGroup>
+                <RadioOption isSelected={!localSettings.messageAlignment || localSettings.messageAlignment === 'default'}>
+                  <input
+                    type="radio"
+                    name="messageAlignment"
+                    value="default"
+                    checked={!localSettings.messageAlignment || localSettings.messageAlignment === 'default'}
+                    onChange={() => handleChange('messageAlignment', 'default')}
+                  />
+                  Default
+                </RadioOption>
                 <RadioOption isSelected={localSettings.messageAlignment === 'left'}>
                   <input
                     type="radio"
@@ -798,9 +811,23 @@ const SettingsModal = ({ settings, updateSettings, closeModal }) => {
                     onChange={() => handleChange('messageAlignment', 'right')}
                   />
                   Right
-                </RadioOption>
-              </RadioGroup>
-            </SettingGroup>
+                  </RadioOption>
+                </RadioGroup>
+              </SettingGroup>
+              <SettingGroup>
+                <SettingLabel>Profiles</SettingLabel>
+                <ToggleWrapper>
+                  <Toggle checked={localSettings.showProfilePicture !== false}>
+                    <input
+                      type="checkbox"
+                      checked={localSettings.showProfilePicture !== false}
+                      onChange={() => handleChange('showProfilePicture', !(localSettings.showProfilePicture !== false))}
+                    />
+                    <Slider checked={localSettings.showProfilePicture !== false} />
+                  </Toggle>
+                  Show profile icon in chats
+                </ToggleWrapper>
+              </SettingGroup>
           </SettingsSection>
 
           {/* Add a new Interface section */}
@@ -837,12 +864,12 @@ const SettingsModal = ({ settings, updateSettings, closeModal }) => {
             <SettingGroup>
               <SettingLabel>Message Bubbles</SettingLabel>
               <RadioGroup>
-                <RadioOption isSelected={localSettings.bubbleStyle === 'modern' || !localSettings.bubbleStyle}>
+                <RadioOption isSelected={localSettings.bubbleStyle === 'modern'}>
                   <input
                     type="radio"
                     name="bubbleStyle"
                     value="modern"
-                    checked={localSettings.bubbleStyle === 'modern' || !localSettings.bubbleStyle}
+                    checked={localSettings.bubbleStyle === 'modern'}
                     onChange={() => handleChange('bubbleStyle', 'modern')}
                   />
                   Modern (rounded)
@@ -857,12 +884,12 @@ const SettingsModal = ({ settings, updateSettings, closeModal }) => {
                   />
                   Classic (rectangle)
                 </RadioOption>
-                <RadioOption isSelected={localSettings.bubbleStyle === 'minimal'}>
+                <RadioOption isSelected={localSettings.bubbleStyle === 'minimal' || !localSettings.bubbleStyle}>
                   <input
                     type="radio"
                     name="bubbleStyle"
                     value="minimal"
-                    checked={localSettings.bubbleStyle === 'minimal'}
+                    checked={localSettings.bubbleStyle === 'minimal' || !localSettings.bubbleStyle}
                     onChange={() => handleChange('bubbleStyle', 'minimal')}
                   />
                   Minimal (no bubbles)

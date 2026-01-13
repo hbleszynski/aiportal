@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import styled from 'styled-components';
+import React, { useState, useEffect, useRef } from 'react';
+import styled, { keyframes, useTheme } from 'styled-components';
 import TetrisGame from './TetrisGame';
 import { useAuth } from '../contexts/AuthContext';
+import { accentOptions, getAccentSwatch } from '../styles/accentColors';
+import { useTranslation } from '../contexts/TranslationContext';
 
 const SettingsOverlay = styled.div`
   position: fixed;
@@ -143,7 +145,7 @@ const SettingsSidebar = styled.div`
     height: auto;
     border-right: none;
     border-bottom: 1px solid ${props => props.theme.border};
-    padding: 10px 0;
+    // padding: 10px 0;
     
     /* Specific styling for the retro theme */
     ${props => props.theme.name === 'retro' && `
@@ -180,10 +182,12 @@ const Title = styled.h2`
 `;
 
 const CloseButton = styled.button`
+  position: absolute;
+  top: 26px;
+  right: 36px;
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.5rem;
   color: ${props => props.theme.text};
   opacity: 0.7;
   transition: all 0.2s ease;
@@ -195,6 +199,16 @@ const CloseButton = styled.button`
   width: 32px;
   height: 32px;
   border-radius: 50%;
+  text-align: center;
+
+  svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   
   /* Specific styling for the retro theme */
   ${props => props.theme.name === 'retro' && `
@@ -206,13 +220,17 @@ const CloseButton = styled.button`
     padding: 0;
     width: 16px;
     height: 16px;
-    font-size: 14px;
-    line-height: 14px;
+    top: 0;
+    right: 0;
     opacity: 1;
     transition: none;
     margin-right: 2px;
     margin-top: 2px;
     color: black;
+    svg {
+      width: 12px;
+      height: 12px;
+    }
     
     &:active {
       border-color: ${props.theme.buttonShadowDark} ${props.theme.buttonHighlightLight} ${props.theme.buttonHighlightLight} ${props.theme.buttonShadowDark};
@@ -231,6 +249,14 @@ const CloseButton = styled.button`
       opacity: 1;
     `}
   }
+  @media (max-width: 768px) {
+    top: 24px;
+    right: 16px;
+    ${props => props.theme.name === 'retro' && `
+      top: 3px;
+      right: 0;
+    `}
+  }
 `;
 
 const NavItem = styled.div`
@@ -239,14 +265,15 @@ const NavItem = styled.div`
   padding: 12px 20px;
   cursor: pointer;
   transition: background-color 0.2s;
-  background-color: ${props => props.$active ? 'rgba(0, 0, 0, 0.05)' : 'transparent'};
-  color: ${props => props.$active ? props.theme.primary : props.theme.text};
+  background-color: ${props => props.$active ? props.theme.accentSurface : 'transparent'};
+  color: ${props => props.$active ? props.theme.accentText : props.theme.text};
+  border-left: 3px solid ${props => props.$active ? props.theme.accentColor : 'transparent'};
   font-weight: ${props => props.$active ? '500' : 'normal'};
   
   /* Specific styling for the retro theme */
   ${props => props.theme.name === 'retro' && `
     padding: 6px 10px;
-    border: ${props.active ? '1px solid' : 'none'};
+    border: ${props.$active ? '1px solid' : 'none'};
     border-color: ${props.theme.buttonShadowDark} ${props.theme.buttonHighlightLight} ${props.theme.buttonHighlightLight} ${props.theme.buttonShadowDark};
     background-color: ${props.active ? props.theme.messageUser : 'transparent'};
     color: ${props.theme.text};
@@ -267,6 +294,7 @@ const NavItem = styled.div`
 const MainContent = styled.div`
   flex: 1;
   padding: 30px;
+  padding-bottom: 50px;
   overflow-y: auto;
   max-height: 650px;
   background-color: ${props => 
@@ -370,7 +398,7 @@ const ThemeOption = styled.label`
   align-items: center;
   padding: 16px 12px;
   border-radius: 10px;
-  border: 2px solid ${props => props.isSelected ? props.theme.primary : 'transparent'};
+  border: 2px solid ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
   background: ${props => props.isSelected ? props.theme.cardBackground : 'rgba(0,0,0,0.03)'};
   cursor: pointer;
   transition: all 0.25s ease;
@@ -404,19 +432,19 @@ const ThemeOption = styled.label`
   &.light-theme {
     background: ${props => props.isSelected ? '#ffffff' : '#f5f5f7'};
     color: #222222;
-    border-color: ${props => props.isSelected ? '#0078d7' : 'transparent'};
+    border-color: ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
   }
   
   &.dark-theme {
     background: ${props => props.isSelected ? '#222222' : '#333333'};
     color: #ffffff;
-    border-color: ${props => props.isSelected ? '#0078d7' : 'transparent'};
+    border-color: ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
   }
   
   &.oled-theme {
     background: ${props => props.isSelected ? '#000000' : '#0a0a0a'};
     color: #ffffff;
-    border-color: ${props => props.isSelected ? '#0078d7' : 'transparent'};
+    border-color: ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
   }
   
   &.ocean-theme {
@@ -424,7 +452,7 @@ const ThemeOption = styled.label`
       'linear-gradient(135deg, #0277bd, #039be5, #4fc3f7)' : 
       'linear-gradient(135deg, #0277bd80, #039be580, #4fc3f780)'};
     color: white;
-    border-color: ${props => props.isSelected ? '#0277bd' : 'transparent'};
+    border-color: ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   }
   
@@ -433,7 +461,7 @@ const ThemeOption = styled.label`
       'linear-gradient(135deg, #2e7d32, #388e3c, #4caf50)' : 
       'linear-gradient(135deg, #2e7d3280, #388e3c80, #4caf5080)'};
     color: white;
-    border-color: ${props => props.isSelected ? '#2e7d32' : 'transparent'};
+    border-color: ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   }
   
@@ -442,7 +470,7 @@ const ThemeOption = styled.label`
       'linear-gradient(135deg, #D60270, #9B4F96, #0038A8)' : 
       'linear-gradient(135deg, #D6027080, #9B4F9680, #0038A880)'};
     color: white;
-    border-color: ${props => props.isSelected ? '#D60270' : 'transparent'};
+    border-color: ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   }
   
@@ -451,7 +479,7 @@ const ThemeOption = styled.label`
       'linear-gradient(135deg, #ff0000, #ff9900, #ffff00, #33cc33, #3399ff, #9933ff)' : 
       'linear-gradient(135deg, #ff000080, #ff990080, #ffff0080, #33cc3380, #3399ff80, #9933ff80)'};
     color: white;
-    border-color: ${props => props.isSelected ? '#ff0000' : 'transparent'};
+    border-color: ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   }
   
@@ -460,7 +488,7 @@ const ThemeOption = styled.label`
       'linear-gradient(135deg, #5BCEFA, #F5A9B8, #FFFFFF, #F5A9B8, #5BCEFA)' : 
       'linear-gradient(135deg, #5BCEFA80, #F5A9B880, #FFFFFF80, #F5A9B880, #5BCEFA80)'};
     color: #333;
-    border-color: ${props => props.isSelected ? '#5BCEFA' : 'transparent'};
+    border-color: ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
     text-shadow: 0 1px 2px rgba(0,0,0,0.2);
   }
   
@@ -469,20 +497,17 @@ const ThemeOption = styled.label`
       'linear-gradient(145deg, #121218, #1a1a22)' : 
       'linear-gradient(145deg, #12121880, #1a1a2280)'};
     color: white;
-    border-color: ${props => props.isSelected ? '#DAA520' : 'transparent'};
+    border-color: ${props => props.isSelected ? props.theme.accentColor : 'transparent'};
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   }
 `;
 
 const SelectBox = styled.select`
-  padding: 12px 14px;
-  border-radius: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
   border: 1px solid ${props => props.theme.border};
   background-color: ${props => props.theme.name === 'dark' || props.theme.name === 'oled' ? '#333' : props.theme.cardBackground || '#f5f5f7'};
   color: ${props => props.theme.text};
-  font-family: inherit;
-  width: 100%;
-  margin-bottom: 15px;
   font-size: 0.95rem;
   
   /* Specific styling for the retro theme */
@@ -529,6 +554,123 @@ const SelectBox = styled.select`
   }
 `;
 
+const ColorInputs = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  width: 100%;
+`;
+
+const ColorInputRow = styled.label`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid ${props => props.theme.border};
+  background: ${props => props.theme.cardBackground || props.theme.sidebar};
+`;
+
+const ColorInputLabel = styled.span`
+  font-weight: 600;
+  color: ${props => props.theme.text};
+`;
+
+const ColorInputField = styled.input`
+  width: 64px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid ${props => props.theme.border};
+  background: transparent;
+  cursor: pointer;
+`;
+
+const AccentDropdown = styled.div`
+  position: relative;
+  width: 100%;
+`;
+
+const AccentTrigger = styled.button`
+  width: 100%;
+  border: 1px solid ${props => props.theme.border};
+  background: ${props => props.theme.cardBackground || props.theme.sidebar};
+  color: ${props => props.theme.text};
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  gap: 12px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    border-color: ${props => props.theme.accentColor || props.theme.primary};
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  }
+`;
+
+const AccentMenu = styled.div`
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: ${props => props.theme.cardBackground || props.theme.sidebar};
+  border: 1px solid ${props => props.theme.border};
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  z-index: 60;
+  max-height: 240px;
+  overflow-y: auto;
+`;
+
+const AccentOptionButton = styled.button`
+  width: 100%;
+  border: none;
+  background: ${props => props.$isSelected ? props.theme.accentSurface : 'transparent'};
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: ${props => props.theme.text};
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-bottom: 1px solid ${props => props.theme.border};
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: ${props => props.$isSelected ? props.theme.accentSurface : 'rgba(0, 0, 0, 0.03)'};
+  }
+`;
+
+const AccentCircle = styled.span`
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid ${props => props.theme.border};
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+`;
+
+const AccentOptionLabel = styled.span`
+  flex: 1;
+  text-align: left;
+`;
+
+const AccentChevron = styled.span`
+  transition: transform 0.2s ease;
+  transform: ${props => props.$open ? 'rotate(-180deg)' : 'rotate(0deg)'};
+`;
+
 const RadioOption = styled.label`
   display: flex;
   align-items: center;
@@ -536,13 +678,16 @@ const RadioOption = styled.label`
   padding: 12px 16px;
   border-radius: 10px;
   background-color: ${props => props.isSelected ? 
-    `${props.theme.primary}15` : 
+    props.theme.accentSurface : 
     'rgba(0, 0, 0, 0.03)'};
   border: 1px solid ${props => props.isSelected ? 
-    props.theme.primary : 
+    props.theme.accentColor : 
     'transparent'};
   transition: all 0.2s ease;
   font-size: 0.95rem;
+  input[type="radio"] {
+    accent-color: ${props => props.theme.accentColor};
+  }
   
   /* Specific styling for the retro theme */
   ${props => props.theme.name === 'retro' && `
@@ -576,13 +721,13 @@ const RadioOption = styled.label`
       width: 5px;
       height: 5px;
       border-radius: 50%;
-      background-color: ${props.theme.text};
+      background-color: ${props.theme.accentColor};
     }
   `}
   
   &:hover {
     background-color: ${props => props.isSelected ? 
-      `${props.theme.primary}20` : 
+      props.theme.accentSurface : 
       'rgba(0, 0, 0, 0.05)'};
       
     /* Specific styling for the retro theme */
@@ -592,7 +737,7 @@ const RadioOption = styled.label`
   }
   
   input {
-    margin-right: 10px;
+    margin: 0 10px 0 0;
   }
 `;
 
@@ -651,14 +796,24 @@ const Slider = styled.span`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: ${props => props.checked ? props.theme.primary : 'rgba(0,0,0,0.15)'};
-  background-image: ${props => props.checked ? 
-    `linear-gradient(to right, ${props.theme.primary}90, ${props.theme.primary})` : 
-    'none'};
-  transition: 0.3s;
-  border-radius: 26px;
+  border-radius: 13px;
+  background-color: ${props => props.checked ? props.theme.accentColor : '#ccc'};
+  transition: background-color 0.3s;
   overflow: visible;
   
+  &:after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: ${props => props.checked ? '25px' : '3px'};
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: white;
+    transition: left 0.3s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+
   /* Specific styling for the retro theme */
   ${props => props.theme.name === 'retro' && `
     border-radius: 0;
@@ -667,52 +822,30 @@ const Slider = styled.span`
     background: ${props.theme.buttonFace};
     background-image: none;
     transition: none;
-    
-    &:before {
-      border-radius: 0;
-      background: ${props.theme.buttonFace};
-      border: 1px solid;
-      border-color: ${props.theme.buttonShadowDark} ${props.theme.buttonHighlightLight} ${props.theme.buttonHighlightLight} ${props.theme.buttonShadowDark};
-      height: 16px;
-      width: 16px;
-      transform: ${props.checked ? 'translateX(20px)' : 'translateX(0)'};
-      content: '';
-      background-color: ${props.theme.buttonFace};
-      position: absolute;
-      top: 3px;
-      left: 3px;
-    }
+
+    /* hide the normal knob */
+    &:after { display: none; }
+
+    /* show checkmark svg when checked */
+    ${props.checked && `
+      &:after {
+        content: '';
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 12px 12px;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3 8.5l3 3L13 4.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'/></svg>");
+      }
+    `}
   `}
-  
-  &:before {
-    position: absolute;
-    content: "";
-    height: ${props => props.checked ? '22px' : '20px'};
-    width: ${props => props.checked ? '22px' : '20px'};
-    left: ${props => props.checked ? '2px' : '3px'};
-    bottom: ${props => props.checked ? '2px' : '3px'};
-    background-color: ${props => props.checked ? '#4caf50' : 'white'};
-    transition: 0.3s;
-    border-radius: 50%;
-    box-shadow: ${props => props.checked ? 
-      `0 2px 5px rgba(0,0,0,0.2)` : 
-      '0 2px 5px rgba(0,0,0,0.2)'};
-    transform: ${props => props.checked ? 'translateX(22px)' : 'translateX(0)'};
-  }
-  
-  /* Visual indicator on track */
-  &:after {
-    content: "";
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background-color: ${props => props.checked ? 'white' : 'transparent'};
-    top: 10px;
-    left: 9px;
-    opacity: ${props => props.checked ? '0.7' : '0'};
-    transition: 0.3s;
-  }
+
+
 `;
 
 const FontSizeOption = styled(RadioOption)`
@@ -745,18 +878,8 @@ const FontSizeOption = styled(RadioOption)`
   .large {
     font-size: 1.1rem;
   }
-`;
-
-const LanguageSelect = styled.select`
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid ${props => props.theme.border};
-  background-color: ${props => props.theme.name === 'dark' || props.theme.name === 'oled' ? '#333' : props.theme.cardBackground || '#f5f5f7'};
-  color: ${props => props.theme.text};
-  
-  option {
-    background-color: ${props => props.theme.name === 'dark' || props.theme.name === 'oled' ? '#333' : props.theme.cardBackground || '#f5f5f7'};
-    color: ${props => props.theme.text};
+  input {
+    margin: 0;
   }
 `;
 
@@ -771,7 +894,7 @@ const TranslateLink = styled.a`
 
 const NotificationToggle = styled.div`
   position: relative;
-  width: 50px;
+  width: 48px;
   height: 26px;
   border-radius: 13px;
   background-color: ${props => props.$isOn ? props.theme.primary : '#ccc'};
@@ -782,13 +905,46 @@ const NotificationToggle = styled.div`
     content: '';
     position: absolute;
     top: 3px;
-    left: ${props => props.$isOn ? '27px' : '3px'};
+    left: ${props => props.$isOn ? '25px' : '3px'};
     width: 20px;
     height: 20px;
     border-radius: 50%;
     background-color: white;
     transition: left 0.3s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
   }
+  
+  ${props => props.theme.name === 'retro' && `
+    width: 16px;
+    height: 16px;
+    border-radius: 0;
+    border: 1px solid;
+    border-color: ${props.theme.buttonShadowDark} ${props.theme.buttonHighlightLight} ${props.theme.buttonHighlightLight} ${props.theme.buttonShadowDark};
+    background: ${props.theme.buttonFace};
+    background-image: none;
+    transition: none;
+
+    /* hide the normal knob */
+    &:after { display: none; }
+
+    /* show checkmark svg when checked */
+    ${props.$isOn && `
+      &:after {
+        content: '';
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 12px 12px;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3 8.5l3 3L13 4.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'/></svg>");
+      }
+    `}
+  `}
 `;
 
 const SystemPromptArea = styled.textarea`
@@ -834,15 +990,16 @@ const SaveButton = styled.button`
   position: absolute;
   bottom: 20px;
   right: 30px;
-  background-color: ${props => props.theme.primary};
-  color: white;
+  background: ${props => props.theme.accentBackground};
+  color: #FFFFFF;
   border: none;
   border-radius: 20px;
   padding: 10px 25px;
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: filter 0.2s, box-shadow 0.2s;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.15);
   
   /* Specific styling for the retro theme */
   ${props => props.theme.name === 'retro' && `
@@ -865,7 +1022,7 @@ const SaveButton = styled.button`
   `}
   
   &:hover {
-    background-color: ${props => props.theme.primaryDark || props.theme.primary + 'dd'};
+    filter: brightness(0.95);
   }
 `;
 
@@ -961,6 +1118,8 @@ const RadioGroup = styled.div`
 
 const SettingGroup = styled.div`
   margin-bottom: 30px;
+  position: relative;
+  overflow: visible;
   
   &:last-child {
     margin-bottom: 0;
@@ -1024,26 +1183,76 @@ const SettingDescription = styled.p`
   `}
 `;
 
-const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboarding }) => {
+  const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboarding }) => {
+  const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState('general');
   const [localSettings, setLocalSettings] = useState(settings || {});
   const [showTetris, setShowTetris] = useState(false);
+  const [isAccentMenuOpen, setIsAccentMenuOpen] = useState(false);
   const { adminUser } = useAuth();
+  const theme = useTheme();
+  const accentMenuRef = useRef(null);
   
   // Add a helper function to determine if in dark mode
   const isDarkMode = () => {
     return localSettings.theme === 'dark' || 
            localSettings.theme === 'oled' || 
            localSettings.theme === 'bisexual' ||
-           localSettings.theme === 'ocean' ||
+    localSettings.theme === 'ocean' ||
            localSettings.theme === 'lakeside';
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (accentMenuRef.current && !accentMenuRef.current.contains(event.target)) {
+        setIsAccentMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const defaultCustomTheme = {
+    background: '#0f172a',
+    text: '#e2e8f0',
+    border: '#4f46e5'
+  };
+
+  const accentValue = localSettings.accentColor || 'theme';
+  const selectedAccentLabel = accentOptions.find(option => option.value === accentValue)?.label || 'Same as theme';
+  const customThemeValues = localSettings.customTheme || defaultCustomTheme;
+
+  const getThemeLabel = (value) => {
+    const translated = t(`settings.themeOptions.${value}`);
+    if (!translated || translated === `settings.themeOptions.${value}`) {
+      return value === 'custom' ? 'Custom' : value.charAt(0).toUpperCase() + value.slice(1);
+    }
+    return translated;
   };
   
   const handleChange = (key, value) => {
     const newSettings = { ...localSettings, [key]: value };
+    if (key === 'theme' && value === 'custom' && !localSettings.customTheme) {
+      newSettings.customTheme = { ...defaultCustomTheme };
+    }
     setLocalSettings(newSettings);
     // Remove immediate parent update to prevent re-renders
     // updateSettings(newSettings);
+  };
+
+  const handleAccentSelect = (value) => {
+    handleChange('accentColor', value);
+    setIsAccentMenuOpen(false);
+  };
+
+  const handleCustomColorChange = (field, value) => {
+    const nextTheme = { ...customThemeValues, [field]: value };
+    handleChange('customTheme', nextTheme);
+    if (localSettings.theme !== 'custom') {
+      handleChange('theme', 'custom');
+    }
   };
 
   const handleSave = () => {
@@ -1065,152 +1274,240 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
     setShowTetris(false);
   };
 
+  const themeOptionValues = [
+    'light',
+    'dark',
+    'oled',
+    'ocean',
+    'forest',
+    'bisexual',
+    'pride',
+    'trans',
+    'lakeside',
+    'retro',
+    'galaxy',
+    'sunset',
+    'cyberpunk',
+    'bubblegum',
+    'desert',
+    'matrix',
+    'comic-book',
+    'custom'
+  ];
+
+  const languageOptionValues = ['en-US', 'fr', 'es', 'de', 'zh'];
+
+  const fontSizeOptions = [
+    { value: 'small', sampleClass: 'small' },
+    { value: 'medium', sampleClass: 'medium' },
+    { value: 'large', sampleClass: 'large' }
+  ];
+
+  const fontFamilyOptions = [
+    'system',
+    'inter',
+    'roboto',
+    'opensans',
+    'montserrat',
+    'lato',
+    'caveat',
+    'georgia',
+    'merriweather'
+  ];
+
+  const sidebarStyleOptions = ['floating', 'traditional'];
+
+  const messageFeatureToggles = [
+    { key: 'showTimestamps', labelKey: 'settings.chats.features.timestamps' },
+    { key: 'showModelIcons', labelKey: 'settings.chats.features.modelIcons' },
+    { key: 'codeHighlighting', labelKey: 'settings.chats.features.codeHighlighting' }
+  ];
+
+  const messageAlignmentOptions = ['left', 'right'];
+
+  const layoutToggles = [
+    { key: 'sidebarAutoCollapse', labelKey: 'settings.interface.layout.autoCollapse' },
+    { key: 'focusMode', labelKey: 'settings.interface.layout.focusMode' },
+    { key: 'showGreeting', labelKey: 'settings.interface.layout.showGreeting', invertDefault: true }
+  ];
+
+  const bubbleStyleOptions = ['minimal', 'modern', 'classic'];
+
+  const messageSpacingOptions = ['compact', 'comfortable', 'spacious'];
+
+  const textSpacingOptions = ['normal', 'relaxed', 'loose'];
+
+  const navItems = [
+    {
+      id: 'general',
+      labelKey: 'settings.nav.general',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      )
+    },
+    {
+      id: 'appearance',
+      labelKey: 'settings.nav.appearance',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <circle cx="12" cy="12" r="4"></circle>
+        </svg>
+      )
+    },
+    {
+      id: 'interface',
+      labelKey: 'settings.nav.interface',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+          <line x1="3" y1="9" x2="21" y2="9"></line>
+        </svg>
+      )
+    },
+    {
+      id: 'chats',
+      labelKey: 'settings.nav.chats',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+      )
+    },
+    {
+      id: 'accessibility',
+      labelKey: 'settings.nav.accessibility',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 8v8" />
+          <path d="M8 12h8" />
+        </svg>
+      )
+    },
+    {
+      id: 'developer',
+      labelKey: 'settings.nav.developer',
+      adminOnly: true,
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+        </svg>
+      )
+    },
+    {
+      id: 'about',
+      labelKey: 'settings.nav.about',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+      )
+    }
+  ];
+
+
   return (
     <SettingsOverlay>
       <SettingsContainer>
+        <CloseButton onClick={handleClose} aria-label={t('settings.close')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </CloseButton>
         <SettingsSidebar>
           <Header>
-            <Title>Settings</Title>
+            <Title>{t('settings.title')}</Title>
           </Header>
-          
-          <NavItem 
-            onClick={() => setActiveSection('general')} 
-            $active={activeSection === 'general'}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            General
-          </NavItem>
-          
-          <NavItem 
-            onClick={() => setActiveSection('appearance')} 
-            $active={activeSection === 'appearance'}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <circle cx="12" cy="12" r="4"></circle>
-            </svg>
-            Appearance
-          </NavItem>
-          
-          <NavItem 
-            onClick={() => setActiveSection('interface')} 
-            $active={activeSection === 'interface'}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-              <line x1="3" y1="9" x2="21" y2="9"></line>
-            </svg>
-            Interface
-          </NavItem>
-          
-          <NavItem 
-            onClick={() => setActiveSection('chats')} 
-            $active={activeSection === 'chats'}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-            </svg>
-            Chats
-          </NavItem>
-          
-          
-          <NavItem 
-            onClick={() => setActiveSection('accessibility')} 
-            $active={activeSection === 'accessibility'}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v8" />
-              <path d="M8 12h8" />
-            </svg>
-            Accessibility
-          </NavItem>
-          
-          {adminUser && (
-            <NavItem 
-              onClick={() => setActiveSection('developer')} 
-              $active={activeSection === 'developer'}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-              </svg>
-              Developer
-            </NavItem>
-          )}
-          
-          <NavItem 
-            onClick={() => setActiveSection('about')} 
-            $active={activeSection === 'about'}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-            About
-          </NavItem>
+          {navItems
+            .filter(item => !item.adminOnly || adminUser)
+            .map(item => (
+              <NavItem
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                $active={activeSection === item.id}
+              >
+                {item.icon}
+                {t(item.labelKey)}
+              </NavItem>
+            ))}
         </SettingsSidebar>
         
         <MainContent>
-          <CloseButton onClick={handleClose}>×</CloseButton>
-          
           {activeSection === 'general' && (
             <div>
-              <SectionTitle>General</SectionTitle>
+              <SectionTitle>{t('settings.sections.general')}</SectionTitle>
               
               <SettingsRow>
-                <SettingsLabel>Theme</SettingsLabel>
+                <SettingsLabel>{t('settings.general.theme.label')}</SettingsLabel>
                 <SelectBox 
                   value={localSettings.theme || 'light'}
                   onChange={(e) => handleChange('theme', e.target.value)}
-                  style={{ 
-                    backgroundColor: isDarkMode() ? '#333' : '#f5f5f7',
-                    color: isDarkMode() ? '#fff' : '#000'
-                  }}
                 >
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                  <option value="oled">OLED</option>
-                  <option value="ocean">Ocean</option>
-                  <option value="forest">Forest</option>
-                  <option value="bisexual">Bisexual</option>
-                  <option value="pride">Pride</option>
-                  <option value="trans">Trans</option>
-                  <option value="lakeside">Lakeside</option>
-                  <option value="retro">Retro</option>
-                  <option value="galaxy">Galaxy</option>
-                  <option value="sunset">Sunset</option>
-                  <option value="cyberpunk">Cyberpunk</option>
-                  <option value="bubblegum">Bubblegum</option>
-                  <option value="desert">Desert</option>
-                  <option value="matrix">Matrix</option>
-                  <option value="comic-book">Comic Book</option>
+                  {themeOptionValues.map(value => (
+                    <option key={value} value={value}>
+                      {getThemeLabel(value)}
+                    </option>
+                  ))}
                 </SelectBox>
               </SettingsRow>
+              {localSettings.theme === 'custom' && (
+                <SettingGroup>
+                  <SettingLabel>Custom Theme Colors</SettingLabel>
+                  <ColorInputs>
+                    <ColorInputRow>
+                      <ColorInputLabel>Background</ColorInputLabel>
+                      <ColorInputField
+                        type="color"
+                        value={customThemeValues.background}
+                        onChange={(e) => handleCustomColorChange('background', e.target.value)}
+                        title="Pick background color"
+                      />
+                    </ColorInputRow>
+                    <ColorInputRow>
+                      <ColorInputLabel>Text</ColorInputLabel>
+                      <ColorInputField
+                        type="color"
+                        value={customThemeValues.text}
+                        onChange={(e) => handleCustomColorChange('text', e.target.value)}
+                        title="Pick text color"
+                      />
+                    </ColorInputRow>
+                    <ColorInputRow>
+                      <ColorInputLabel>Border</ColorInputLabel>
+                      <ColorInputField
+                        type="color"
+                        value={customThemeValues.border}
+                        onChange={(e) => handleCustomColorChange('border', e.target.value)}
+                        title="Pick border color"
+                      />
+                    </ColorInputRow>
+                  </ColorInputs>
+                </SettingGroup>
+              )}
               
               <SettingsRow>
-                <SettingsLabel>Language</SettingsLabel>
-                <LanguageSelect 
+                <SettingsLabel>{t('settings.general.language.label')}</SettingsLabel>
+                <SelectBox 
                   value={localSettings.language || 'en-US'} 
                   onChange={e => handleChange('language', e.target.value)}
-                  style={{ 
-                    backgroundColor: isDarkMode() ? '#333' : '#f5f5f7',
-                    color: isDarkMode() ? '#fff' : '#000'
-                  }}
                 >
-                  <option value="en-US">English (US)</option>
-                  <option value="fr">French</option>
-                  <option value="es">Spanish</option>
-                  <option value="de">German</option>
-                  <option value="zh">Chinese</option>
-                </LanguageSelect>
+                  {languageOptionValues.map(value => (
+                    <option key={value} value={value}>
+                      {t(`settings.languageOptions.${value}`)}
+                    </option>
+                  ))}
+                </SelectBox>
               </SettingsRow>
                             
               <SettingsRow>
-                <SettingsLabel>Notifications</SettingsLabel>
+                <SettingsLabel>{t('settings.general.notifications.label')}</SettingsLabel>
                 <NotificationToggle 
                   $isOn={localSettings.notifications || false} 
                   onClick={() => handleChange('notifications', !localSettings.notifications)}
@@ -1221,92 +1518,98 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
           
           {activeSection === 'appearance' && (
             <div>
-              <SectionTitle>Appearance</SectionTitle>
+              <SectionTitle>{t('settings.sections.appearance')}</SectionTitle>
               
               <SettingGroup>
-                <SettingLabel>Font Size</SettingLabel>
+                <SettingLabel>{t('settings.appearance.fontSize.label')}</SettingLabel>
                 <RadioGroup>
-                  <FontSizeOption isSelected={localSettings.fontSize === 'small'}>
-                    <input
-                      type="radio"
-                      name="fontSize"
-                      value="small"
-                      checked={localSettings.fontSize === 'small'}
-                      onChange={() => handleChange('fontSize', 'small')}
-                    />
-                    <div className="sample-text small">Aa</div>
-                    <div className="size-label">Small</div>
-                  </FontSizeOption>
-                  <FontSizeOption isSelected={localSettings.fontSize === 'medium'}>
-                    <input
-                      type="radio"
-                      name="fontSize"
-                      value="medium"
-                      checked={localSettings.fontSize === 'medium'}
-                      onChange={() => handleChange('fontSize', 'medium')}
-                    />
-                    <div className="sample-text medium">Aa</div>
-                    <div className="size-label">Medium</div>
-                  </FontSizeOption>
-                  <FontSizeOption isSelected={localSettings.fontSize === 'large'}>
-                    <input
-                      type="radio"
-                      name="fontSize"
-                      value="large"
-                      checked={localSettings.fontSize === 'large'}
-                      onChange={() => handleChange('fontSize', 'large')}
-                    />
-                    <div className="sample-text large">Aa</div>
-                    <div className="size-label">Large</div>
-                  </FontSizeOption>
+                  {fontSizeOptions.map(option => (
+                    <FontSizeOption key={option.value} isSelected={localSettings.fontSize === option.value}>
+                      <input
+                        type="radio"
+                        name="fontSize"
+                        value={option.value}
+                        checked={localSettings.fontSize === option.value}
+                        onChange={() => handleChange('fontSize', option.value)}
+                      />
+                      <div className={`sample-text ${option.sampleClass}`}>Aa</div>
+                      <div className="size-label">{t(`settings.fontSize.${option.value}`)}</div>
+                    </FontSizeOption>
+                  ))}
                 </RadioGroup>
               </SettingGroup>
 
               <SettingGroup>
-                <SettingLabel>Font Family</SettingLabel>
+                <SettingLabel>{t('settings.appearance.fontFamily.label')}</SettingLabel>
                 <SelectBox
                   value={localSettings.fontFamily || 'system'}
                   onChange={(e) => handleChange('fontFamily', e.target.value)}
-                  style={{ 
-                    backgroundColor: isDarkMode() ? '#333' : '#f5f5f7',
-                    color: isDarkMode() ? '#fff' : '#000'
-                  }}
                 >
-                  <option value="system">System Default</option>
-                  <option value="inter">Inter</option>
-                  <option value="roboto">Roboto</option>
-                  <option value="opensans">Open Sans</option>
-                  <option value="georgia">Georgia</option>
-                  <option value="merriweather">Merriweather</option>
+                  {fontFamilyOptions.map(option => (
+                    <option key={option} value={option}>
+                      {t(`settings.fontFamily.${option}`)}
+                    </option>
+                  ))}
                 </SelectBox>
               </SettingGroup>
 
               <SettingGroup>
-                <SettingLabel>Sidebar Style</SettingLabel>
+                <SettingLabel>Accent Color</SettingLabel>
+                <AccentDropdown ref={accentMenuRef}>
+                      <AccentTrigger
+                        type="button"
+                        onClick={() => setIsAccentMenuOpen(prev => !prev)}
+                        aria-haspopup="listbox"
+                        aria-expanded={isAccentMenuOpen}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <AccentCircle style={{ background: getAccentSwatch(accentValue, theme) }} />
+                          <AccentOptionLabel>{selectedAccentLabel}</AccentOptionLabel>
+                        </span>
+                        <AccentChevron $open={isAccentMenuOpen}>▾</AccentChevron>
+                      </AccentTrigger>
+                      {isAccentMenuOpen && (
+                        <AccentMenu role="listbox">
+                          {accentOptions.map((option) => (
+                        <AccentOptionButton
+                          key={option.value}
+                          type="button"
+                          onClick={() => handleAccentSelect(option.value)}
+                          $isSelected={accentValue === option.value}
+                        >
+                          <AccentCircle style={{ background: getAccentSwatch(option.value, theme) }} />
+                          <AccentOptionLabel>{option.label}</AccentOptionLabel>
+                        </AccentOptionButton>
+                      ))}
+                    </AccentMenu>
+                  )}
+                </AccentDropdown>
+                <SettingDescription>
+                  Accent colors update buttons, bubbles, toggles, and other highlights throughout the interface.
+                </SettingDescription>
+              </SettingGroup>
+
+              <SettingGroup>
+                <SettingLabel>{t('settings.appearance.sidebarStyle.label')}</SettingLabel>
                 <RadioGroup>
-                  <RadioOption isSelected={localSettings.sidebarStyle === 'floating' || !localSettings.sidebarStyle}>
-                    <input
-                      type="radio"
-                      name="sidebarStyle"
-                      value="floating"
-                      checked={localSettings.sidebarStyle === 'floating' || !localSettings.sidebarStyle}
-                      onChange={() => handleChange('sidebarStyle', 'floating')}
-                    />
-                    Floating
-                  </RadioOption>
-                  <RadioOption isSelected={localSettings.sidebarStyle === 'traditional'}>
-                    <input
-                      type="radio"
-                      name="sidebarStyle"
-                      value="traditional"
-                      checked={localSettings.sidebarStyle === 'traditional'}
-                      onChange={() => handleChange('sidebarStyle', 'traditional')}
-                    />
-                    Traditional
-                  </RadioOption>
+                  {sidebarStyleOptions.map(option => (
+                    <RadioOption
+                      key={option}
+                      isSelected={localSettings.sidebarStyle === option || (!localSettings.sidebarStyle && option === 'floating')}
+                    >
+                      <input
+                        type="radio"
+                        name="sidebarStyle"
+                        value={option}
+                        checked={localSettings.sidebarStyle === option || (!localSettings.sidebarStyle && option === 'floating')}
+                        onChange={() => handleChange('sidebarStyle', option)}
+                      />
+                      {t(`settings.appearance.sidebarStyle.${option}`)}
+                    </RadioOption>
+                  ))}
                 </RadioGroup>
                 <SettingDescription>
-                  Choose between a floating sidebar with rounded corners and margins, or a traditional sidebar that connects to the side of the screen.
+                  {t('settings.appearance.sidebarStyle.description')}
                 </SettingDescription>
               </SettingGroup>
             </div>
@@ -1314,50 +1617,28 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
           
           {activeSection === 'chats' && (
             <div>
-              <SectionTitle>Chat Settings</SectionTitle>
+              <SectionTitle>{t('settings.sections.chats')}</SectionTitle>
               
               <SettingGroup>
-                <SettingLabel>Message Features</SettingLabel>
+                <SettingLabel>{t('settings.chats.features.label')}</SettingLabel>
                 
-                <ToggleWrapper>
-                  <Toggle checked={localSettings.showTimestamps}>
-                    <input
-                      type="checkbox"
-                      checked={localSettings.showTimestamps}
-                      onChange={() => handleChange('showTimestamps', !localSettings.showTimestamps)}
-                    />
-                    <Slider checked={localSettings.showTimestamps} />
-                  </Toggle>
-                  Show message timestamps
-                </ToggleWrapper>
-                
-                <ToggleWrapper>
-                  <Toggle checked={localSettings.showModelIcons}>
-                    <input
-                      type="checkbox"
-                      checked={localSettings.showModelIcons}
-                      onChange={() => handleChange('showModelIcons', !localSettings.showModelIcons)}
-                    />
-                    <Slider checked={localSettings.showModelIcons} />
-                  </Toggle>
-                  Show model icons in messages
-                </ToggleWrapper>
-                
-                <ToggleWrapper>
-                  <Toggle checked={localSettings.codeHighlighting}>
-                    <input
-                      type="checkbox"
-                      checked={localSettings.codeHighlighting}
-                      onChange={() => handleChange('codeHighlighting', !localSettings.codeHighlighting)}
-                    />
-                    <Slider checked={localSettings.codeHighlighting} />
-                  </Toggle>
-                  Enable code syntax highlighting
-                </ToggleWrapper>
+                {messageFeatureToggles.map(feature => (
+                  <ToggleWrapper key={feature.key}>
+                    <Toggle checked={!!localSettings[feature.key]}>
+                      <input
+                        type="checkbox"
+                        checked={!!localSettings[feature.key]}
+                        onChange={() => handleChange(feature.key, !localSettings[feature.key])}
+                      />
+                      <Slider checked={!!localSettings[feature.key]} />
+                    </Toggle>
+                    {t(feature.labelKey)}
+                  </ToggleWrapper>
+                ))}
               </SettingGroup>
               
               <SettingGroup>
-                <SettingLabel>Message Sending</SettingLabel>
+                <SettingLabel>{t('settings.chats.sending.label')}</SettingLabel>
                 <ToggleWrapper>
                   <Toggle checked={localSettings.sendWithEnter}>
                     <input
@@ -1367,150 +1648,154 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
                     />
                     <Slider checked={localSettings.sendWithEnter} />
                   </Toggle>
-                  Send message with Enter (use Shift+Enter for new line)
+                  {t('settings.chats.sending.sendWithEnter')}
                 </ToggleWrapper>
               </SettingGroup>
               
-              <SettingGroup>
-                <SettingLabel>Message Alignment</SettingLabel>
-                <RadioGroup>
-                  <RadioOption isSelected={localSettings.messageAlignment === 'left'}>
+            <SettingGroup>
+              <SettingLabel>{t('settings.appearance.accent.color', 'Accent Color')}</SettingLabel>
+              <AccentDropdown ref={accentMenuRef}>
+                <AccentTrigger
+                  type="button"
+                  onClick={() => setIsAccentMenuOpen(prev => !prev)}
+                  aria-haspopup="listbox"
+                  aria-expanded={isAccentMenuOpen}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <AccentCircle style={{ background: getAccentSwatch(accentValue, theme) }} />
+                    <AccentOptionLabel>{selectedAccentLabel}</AccentOptionLabel>
+                  </span>
+                  <AccentChevron $open={isAccentMenuOpen}>▾</AccentChevron>
+                </AccentTrigger>
+                {isAccentMenuOpen && (
+                  <AccentMenu role="listbox">
+                    {accentOptions.map((option) => (
+                      <AccentOptionButton
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleAccentSelect(option.value)}
+                        $isSelected={accentValue === option.value}
+                      >
+                        <AccentCircle style={{ background: getAccentSwatch(option.value, theme) }} />
+                        <AccentOptionLabel>{option.label}</AccentOptionLabel>
+                      </AccentOptionButton>
+                    ))}
+                  </AccentMenu>
+                )}
+              </AccentDropdown>
+              <SettingDescription>
+                {t('settings.appearance.accent.description')}
+              </SettingDescription>
+            </SettingGroup>
+
+            <SettingGroup>
+              <SettingLabel>{t('settings.chats.alignment.label')}</SettingLabel>
+              <RadioGroup>
+                {['default', 'left', 'right'].map(option => (
+                  <RadioOption
+                    key={option}
+                    isSelected={(localSettings.messageAlignment || 'default') === option}
+                  >
                     <input
                       type="radio"
                       name="messageAlignment"
-                      value="left"
-                      checked={localSettings.messageAlignment === 'left'}
-                      onChange={() => handleChange('messageAlignment', 'left')}
+                      value={option}
+                      checked={(localSettings.messageAlignment || 'default') === option}
+                      onChange={() => handleChange('messageAlignment', option)}
                     />
-                    Left
+                    {t(`settings.chats.alignment.${option}`, option.charAt(0).toUpperCase() + option.slice(1))}
                   </RadioOption>
-                  <RadioOption isSelected={localSettings.messageAlignment === 'right'}>
-                    <input
-                      type="radio"
-                      name="messageAlignment"
-                      value="right"
-                      checked={localSettings.messageAlignment === 'right'}
-                      onChange={() => handleChange('messageAlignment', 'right')}
-                    />
-                    Right
-                  </RadioOption>
-                </RadioGroup>
-              </SettingGroup>
+                ))}
+              </RadioGroup>
+            </SettingGroup>
+
+            <SettingGroup>
+              <SettingLabel>{t('settings.chats.profiles.toggleVisibility.label', 'Toggle profile icon visibility')}</SettingLabel>
+              <ToggleWrapper>
+                <Toggle checked={localSettings.showProfilePicture !== false}>
+                  <input
+                    type="checkbox"
+                    checked={localSettings.showProfilePicture !== false}
+                    onChange={() => handleChange('showProfilePicture', !(localSettings.showProfilePicture !== false))}
+                  />
+                  <Slider checked={localSettings.showProfilePicture !== false} />
+                </Toggle>
+                {t('settings.chats.profiles.toggleVisibility.description', 'Show profile icon in chats')}
+              </ToggleWrapper>
+            </SettingGroup>
+
             </div>
           )}
           
           {activeSection === 'interface' && (
             <div>
-              <SectionTitle>Interface Settings</SectionTitle>
+              <SectionTitle>{t('settings.sections.interface')}</SectionTitle>
               
               <SettingGroup>
-                <SettingLabel>Layout</SettingLabel>
-                <ToggleWrapper>
-                  <Toggle checked={localSettings.sidebarAutoCollapse || false}>
-                    <input
-                      type="checkbox"
-                      checked={localSettings.sidebarAutoCollapse || false}
-                      onChange={() => handleChange('sidebarAutoCollapse', !localSettings.sidebarAutoCollapse)}
-                    />
-                    <Slider checked={localSettings.sidebarAutoCollapse || false} />
-                  </Toggle>
-                  Auto-collapse sidebar when chatting
-                </ToggleWrapper>
-                
-                <ToggleWrapper>
-                  <Toggle checked={localSettings.focusMode || false}>
-                    <input
-                      type="checkbox"
-                      checked={localSettings.focusMode || false}
-                      onChange={() => handleChange('focusMode', !localSettings.focusMode)}
-                    />
-                    <Slider checked={localSettings.focusMode || false} />
-                  </Toggle>
-                  Focus mode (hide UI elements while typing)
-                </ToggleWrapper>
-
-                <ToggleWrapper>
-                  <Toggle checked={localSettings.showGreeting !== false}>
-                    <input
-                      type="checkbox"
-                      checked={localSettings.showGreeting !== false}
-                      onChange={() => handleChange('showGreeting', localSettings.showGreeting === false ? true : false)}
-                    />
-                    <Slider checked={localSettings.showGreeting !== false} />
-                  </Toggle>
-                  Show greeting message on empty chat
-                </ToggleWrapper>
+                <SettingLabel>{t('settings.interface.layout.label')}</SettingLabel>
+                {layoutToggles.map(toggle => {
+                  const isOn = toggle.invertDefault ? localSettings[toggle.key] !== false : !!localSettings[toggle.key];
+                  return (
+                    <ToggleWrapper key={toggle.key}>
+                      <Toggle checked={isOn}>
+                        <input
+                          type="checkbox"
+                          checked={isOn}
+                          onChange={() => {
+                            if (toggle.invertDefault) {
+                              handleChange(toggle.key, localSettings[toggle.key] === false ? true : false);
+                            } else {
+                              handleChange(toggle.key, !localSettings[toggle.key]);
+                            }
+                          }}
+                        />
+                        <Slider checked={isOn} />
+                      </Toggle>
+                      {t(toggle.labelKey)}
+                    </ToggleWrapper>
+                  );
+                })}
               </SettingGroup>
               
               <SettingGroup>
-                <SettingLabel>Message Bubbles</SettingLabel>
+                <SettingLabel>{t('settings.interface.bubbles.label')}</SettingLabel>
                 <RadioGroup>
-                  <RadioOption isSelected={localSettings.bubbleStyle === 'modern' || !localSettings.bubbleStyle}>
+                  {bubbleStyleOptions.map(option => (
+                  <RadioOption
+                    key={option}
+                    isSelected={localSettings.bubbleStyle === option || (!localSettings.bubbleStyle && option === 'minimal')}
+                  >
                     <input
                       type="radio"
                       name="bubbleStyle"
-                      value="modern"
-                      checked={localSettings.bubbleStyle === 'modern' || !localSettings.bubbleStyle}
-                      onChange={() => handleChange('bubbleStyle', 'modern')}
+                      value={option}
+                      checked={localSettings.bubbleStyle === option || (!localSettings.bubbleStyle && option === 'minimal')}
+                      onChange={() => handleChange('bubbleStyle', option)}
                     />
-                    Modern (rounded)
+                    {t(`settings.interface.bubbles.${option}`)}
                   </RadioOption>
-                  <RadioOption isSelected={localSettings.bubbleStyle === 'classic'}>
-                    <input
-                      type="radio"
-                      name="bubbleStyle"
-                      value="classic"
-                      checked={localSettings.bubbleStyle === 'classic'}
-                      onChange={() => handleChange('bubbleStyle', 'classic')}
-                    />
-                    Classic (rectangle)
-                  </RadioOption>
-                  <RadioOption isSelected={localSettings.bubbleStyle === 'minimal'}>
-                    <input
-                      type="radio"
-                      name="bubbleStyle"
-                      value="minimal"
-                      checked={localSettings.bubbleStyle === 'minimal'}
-                      onChange={() => handleChange('bubbleStyle', 'minimal')}
-                    />
-                    Minimal (no bubbles)
-                  </RadioOption>
+                  ))}
                 </RadioGroup>
               </SettingGroup>
               
               <SettingGroup>
-                <SettingLabel>Message Spacing</SettingLabel>
+                <SettingLabel>{t('settings.interface.spacing.label')}</SettingLabel>
                 <RadioGroup>
-                  <RadioOption isSelected={localSettings.messageSpacing === 'compact'}>
-                    <input
-                      type="radio"
-                      name="messageSpacing"
-                      value="compact"
-                      checked={localSettings.messageSpacing === 'compact'}
-                      onChange={() => handleChange('messageSpacing', 'compact')}
-                    />
-                    Compact
-                  </RadioOption>
-                  <RadioOption isSelected={localSettings.messageSpacing === 'comfortable' || !localSettings.messageSpacing}>
-                    <input
-                      type="radio"
-                      name="messageSpacing"
-                      value="comfortable"
-                      checked={localSettings.messageSpacing === 'comfortable' || !localSettings.messageSpacing}
-                      onChange={() => handleChange('messageSpacing', 'comfortable')}
-                    />
-                    Comfortable
-                  </RadioOption>
-                  <RadioOption isSelected={localSettings.messageSpacing === 'spacious'}>
-                    <input
-                      type="radio"
-                      name="messageSpacing"
-                      value="spacious"
-                      checked={localSettings.messageSpacing === 'spacious'}
-                      onChange={() => handleChange('messageSpacing', 'spacious')}
-                    />
-                    Spacious
-                  </RadioOption>
+                  {messageSpacingOptions.map(option => (
+                    <RadioOption
+                      key={option}
+                      isSelected={localSettings.messageSpacing === option || (!localSettings.messageSpacing && option === 'comfortable')}
+                    >
+                      <input
+                        type="radio"
+                        name="messageSpacing"
+                        value={option}
+                        checked={localSettings.messageSpacing === option || (!localSettings.messageSpacing && option === 'comfortable')}
+                        onChange={() => handleChange('messageSpacing', option)}
+                      />
+                      {t(`settings.interface.spacing.${option}`)}
+                    </RadioOption>
+                  ))}
                 </RadioGroup>
               </SettingGroup>
             </div>
@@ -1518,10 +1803,10 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
           
           {activeSection === 'accessibility' && (
             <div>
-              <SectionTitle>Accessibility</SectionTitle>
+              <SectionTitle>{t('settings.sections.accessibility')}</SectionTitle>
               
               <SettingGroup>
-                <SettingLabel>Visual Comfort</SettingLabel>
+                <SettingLabel>{t('settings.accessibility.visual.label')}</SettingLabel>
                 <ToggleWrapper>
                   <Toggle checked={localSettings.highContrast || false}>
                     <input
@@ -1531,7 +1816,7 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
                     />
                     <Slider checked={localSettings.highContrast || false} />
                   </Toggle>
-                  High Contrast Mode
+                  {t('settings.accessibility.visual.highContrast')}
                 </ToggleWrapper>
                 
                 <ToggleWrapper>
@@ -1543,43 +1828,28 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
                     />
                     <Slider checked={localSettings.reducedMotion || false} />
                   </Toggle>
-                  Reduce animations and motion
+                  {t('settings.accessibility.visual.reducedMotion')}
                 </ToggleWrapper>
               </SettingGroup>
               
               <SettingGroup>
-                <SettingLabel>Text Spacing</SettingLabel>
+                <SettingLabel>{t('settings.accessibility.textSpacing.label')}</SettingLabel>
                 <RadioGroup>
-                  <RadioOption isSelected={localSettings.lineSpacing === 'normal' || !localSettings.lineSpacing}>
-                    <input
-                      type="radio"
-                      name="lineSpacing"
-                      value="normal"
-                      checked={localSettings.lineSpacing === 'normal' || !localSettings.lineSpacing}
-                      onChange={() => handleChange('lineSpacing', 'normal')}
-                    />
-                    Normal
-                  </RadioOption>
-                  <RadioOption isSelected={localSettings.lineSpacing === 'relaxed'}>
-                    <input
-                      type="radio"
-                      name="lineSpacing"
-                      value="relaxed"
-                      checked={localSettings.lineSpacing === 'relaxed'}
-                      onChange={() => handleChange('lineSpacing', 'relaxed')}
-                    />
-                    Relaxed
-                  </RadioOption>
-                  <RadioOption isSelected={localSettings.lineSpacing === 'loose'}>
-                    <input
-                      type="radio"
-                      name="lineSpacing"
-                      value="loose"
-                      checked={localSettings.lineSpacing === 'loose'}
-                      onChange={() => handleChange('lineSpacing', 'loose')}
-                    />
-                    Loose
-                  </RadioOption>
+                  {textSpacingOptions.map(option => (
+                    <RadioOption
+                      key={option}
+                      isSelected={localSettings.lineSpacing === option || (!localSettings.lineSpacing && option === 'normal')}
+                    >
+                      <input
+                        type="radio"
+                        name="lineSpacing"
+                        value={option}
+                        checked={localSettings.lineSpacing === option || (!localSettings.lineSpacing && option === 'normal')}
+                        onChange={() => handleChange('lineSpacing', option)}
+                      />
+                      {t(`settings.accessibility.textSpacing.${option}`)}
+                    </RadioOption>
+                  ))}
                 </RadioGroup>
               </SettingGroup>
             </div>
@@ -1587,12 +1857,12 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
           
           {activeSection === 'developer' && adminUser && (
             <div>
-              <SectionTitle>Developer</SectionTitle>
+              <SectionTitle>{t('settings.sections.developer')}</SectionTitle>
               
               <SettingGroup>
-                <SettingLabel>Onboarding</SettingLabel>
+                <SettingLabel>{t('settings.developer.onboarding.label')}</SettingLabel>
                 <SettingDescription>
-                  Reset the onboarding flow for testing purposes. This will show the welcome tutorial again.
+                  {t('settings.developer.onboarding.description')}
                 </SettingDescription>
                 <SaveButton 
                   onClick={() => {
@@ -1608,7 +1878,7 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
                     marginTop: '10px'
                   }}
                 >
-                  Restart Onboarding
+                  {t('settings.developer.onboarding.restart')}
                 </SaveButton>
               </SettingGroup>
             </div>
@@ -1616,13 +1886,13 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
           
           {activeSection === 'about' && (
             <AboutContainer>
-              <SectionTitle>About</SectionTitle>
+              <SectionTitle>{t('settings.sections.about')}</SectionTitle>
               
               <LogoContainer>
                 <LogoIcon onClick={handleEasterEgg}>
                   <img 
                     src={localSettings.theme === 'lakeside' ? 'https://demo-andromeda.me/static/favicon.png' : '/sculptor.svg'} 
-                    alt={localSettings.theme === 'lakeside' ? 'Andromeda Logo' : 'Sculptor Logo'} 
+                    alt={localSettings.theme === 'lakeside' ? t('settings.about.logoAlt.lakeside') : t('settings.about.logoAlt.default')} 
                     style={localSettings.theme === 'lakeside' ? {
                       filter: 'brightness(0) saturate(100%) invert(58%) sepia(53%) saturate(804%) hue-rotate(20deg) brightness(91%) contrast(85%)'
                     } : {}}
@@ -1632,19 +1902,21 @@ const NewSettingsPanel = ({ settings, updateSettings, closeModal, onRestartOnboa
                   onClick={handleEasterEgg}
                   style={localSettings.theme === 'lakeside' ? { color: 'rgb(198, 146, 20)' } : {}}
                 >
-                  {localSettings.theme === 'lakeside' ? 'Andromeda' : 'Sculptor'}
+                  {localSettings.theme === 'lakeside' ? t('settings.about.logoTitle.lakeside') : t('settings.about.logoTitle.default')}
                 </LogoTitle>
               </LogoContainer>
               
-              <AboutTitle>Made with <RainbowText>Pride</RainbowText></AboutTitle>
+              <AboutTitle>
+                {t('settings.about.madeWith')} <RainbowText>{t('settings.about.prideWord')}</RainbowText>
+              </AboutTitle>
               
-              <AboutText>From the Andromeda Team, with ❤️</AboutText>
+              <AboutText>{t('settings.about.teamMessage')}</AboutText>
               
-              <VersionText>Sculptor Alpha 0.0.6</VersionText>
+              <VersionText>{t('settings.about.version')}</VersionText>
             </AboutContainer>
           )}
           
-          <SaveButton onClick={handleSave}>Save</SaveButton>
+          <SaveButton onClick={handleSave}>{t('settings.saveButton')}</SaveButton>
         </MainContent>
       </SettingsContainer>
       
