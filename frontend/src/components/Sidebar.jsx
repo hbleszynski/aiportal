@@ -1055,6 +1055,22 @@ const Sidebar = ({
       )
     },
     {
+      key: 'timelapse',
+      to: '/timelapse',
+      translationKey: 'sidebar.nav.timelapse',
+      fallback: 'Time-Lapse',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="2.5"></circle>
+          <circle cx="12" cy="12" r="7.5"></circle>
+          <path d="M12 4V2"></path>
+          <path d="M12 22v-2"></path>
+          <path d="m18 6 1.4-1.4"></path>
+          <path d="M4.6 19.4 6 18"></path>
+        </svg>
+      )
+    },
+    {
       key: 'admin',
       to: '/admin',
       translationKey: 'sidebar.nav.admin',
@@ -1148,7 +1164,7 @@ const Sidebar = ({
               return (
                 <SidebarNavLink key={link.key} to={link.to} end={link.end}>
                   {link.icon}
-                  <span>{t(link.translationKey)}</span>
+                  <span>{t(link.translationKey, link.fallback)}</span>
                 </SidebarNavLink>
               );
             })}

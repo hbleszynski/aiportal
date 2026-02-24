@@ -32,6 +32,7 @@ import AdminPage from './pages/AdminPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import WorkspacePage from './pages/WorkspacePage';
+import TimeLapseDashboardPage from './pages/TimeLapseDashboardPage';
 import ForcedLoginScreen from './components/ForcedLoginScreen';
 import MobileForcedLoginScreen from './components/mobile/MobileForcedLoginScreen';
 import DinosaurRunGame from './components/DinosaurRunGame';
@@ -1145,6 +1146,7 @@ const AppContent = ({ onSettingsLanguageChange }) => {
               <Route path="/admin" element={<AdminPage collapsed={collapsed} />} />
               <Route path="/projects" element={<ProjectsPage projects={projects} createNewProject={createNewProject} deleteProject={deleteProject} toggleProjectStar={toggleProjectStar} collapsed={collapsed} chats={chats} />} />
               <Route path="/workspace" element={<WorkspacePage collapsed={collapsed} />} />
+              <Route path="/timelapse" element={<TimeLapseDashboardPage collapsed={collapsed} />} />
               <Route path="/projects/:projectId" element={
                 <ProjectDetailPage
                   projects={projects}
